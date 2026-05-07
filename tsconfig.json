@@ -51,6 +51,10 @@
     "next.config.js"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/lib/services",
+    "src/lib/repositories",
+    "src/lib/middleware",
+    "src/lib/validators"
   ]
 }

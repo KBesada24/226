@@ -37,7 +37,7 @@ export default function CreateClubPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { mutate: createClub, isPending } = useCreateClub();
 
@@ -50,9 +50,14 @@ export default function CreateClubPage() {
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
   // Redirect if not authenticated
-  if (!isAuthenticated) {
-    router.push('/login');
+  if (isLoading || !isAuthenticated) {
     return null;
   }
 
