@@ -1,9 +1,12 @@
 import os
 import secrets
 import uuid
+import base64
+import json
 from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import bcrypt
 import jwt
@@ -12,6 +15,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from supabase import Client, create_client
+
+
+def load_env_file(path: str) -> None:
+    if not os.path.exists(path):
+        return
+
+    with open(path, encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            name = name.strip()
+            value = value.strip().strip("'\"")
+            if name and name not in os.environ:
+                os.environ[name] = value
+
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_env_file(os.path.join(ROOT_DIR, ".env"))
+load_env_file(os.path.join(BACKEND_DIR, ".env"))
 
 
 class AppError(Exception):
@@ -97,11 +122,53 @@ def env(name: str, fallback: Optional[str] = None) -> Optional[str]:
     return os.getenv(name) or (os.getenv(fallback) if fallback else None)
 
 
+def supabase_key_ref(key: str) -> Optional[str]:
+    parts = key.split(".")
+    if len(parts) < 2:
+        return None
+    try:
+        payload = parts[1] + "=" * (-len(parts[1]) % 4)
+        data = json.loads(base64.urlsafe_b64decode(payload))
+    except (ValueError, json.JSONDecodeError):
+        return None
+    ref = data.get("ref")
+    return ref if isinstance(ref, str) else None
+
+
+def supabase_url_ref(url: str) -> Optional[str]:
+    hostname = urlparse(url).hostname or ""
+    suffix = ".supabase.co"
+    if hostname.endswith(suffix):
+        return hostname[: -len(suffix)]
+    return None
+
+
 def get_supabase() -> Client:
     url = env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or env("SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or env("SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        or env("SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+    )
     if not url or not key:
-        raise AppError(500, "CONFIGURATION_ERROR", "Supabase URL and key are required")
+        missing = []
+        if not url:
+            missing.append("SUPABASE_URL")
+        if not key:
+            missing.append("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY")
+        raise AppError(
+            500,
+            "CONFIGURATION_ERROR",
+            f"Missing Supabase configuration: {', '.join(missing)}",
+        )
+    url_ref = supabase_url_ref(url)
+    key_ref = supabase_key_ref(key)
+    if url_ref and key_ref and url_ref != key_ref:
+        raise AppError(
+            500,
+            "CONFIGURATION_ERROR",
+            "Supabase URL project ref does not match the configured Supabase key",
+        )
     return create_client(url, key)
 
 
@@ -945,3 +1012,17 @@ async def upload_image(file: UploadFile = File(...), actor: dict[str, Any] = Dep
     storage.upload(path, content, {"content-type": file.content_type, "x-upsert": "false"})
     public_url = storage.get_public_url(path)
     return ok({"url": public_url})
+
+
+if __name__ == "__main__":
+    import sys
+
+    import uvicorn
+
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    uvicorn.run(
+        "app.main:app",
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+        reload=os.getenv("RELOAD", "").lower() in {"1", "true", "yes"},
+    )

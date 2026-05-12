@@ -14,17 +14,17 @@ USING ( bucket_id = 'club-assets' );
 CREATE POLICY "Authenticated users can upload"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK ( bucket_id = 'club-assets' AND owner_id = auth.uid() );
+WITH CHECK ( bucket_id = 'club-assets' AND owner_id = auth.uid()::text );
 
 -- Allow users to update their own files (optional, good for editing)
 CREATE POLICY "Users can update own files"
 ON storage.objects FOR UPDATE
 TO authenticated
-USING ( bucket_id = 'club-assets' AND auth.uid() = owner_id )
-WITH CHECK ( bucket_id = 'club-assets' AND auth.uid() = owner_id );
+USING ( bucket_id = 'club-assets' AND auth.uid()::text = owner_id )
+WITH CHECK ( bucket_id = 'club-assets' AND auth.uid()::text = owner_id );
 
 -- Allow users to delete their own files
 CREATE POLICY "Users can delete own files"
 ON storage.objects FOR DELETE
 TO authenticated
-USING ( bucket_id = 'club-assets' AND auth.uid() = owner_id );
+USING ( bucket_id = 'club-assets' AND auth.uid()::text = owner_id );
