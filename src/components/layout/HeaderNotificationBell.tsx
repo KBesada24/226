@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +20,8 @@ interface Notification {
   notificationId: string;
   title: string;
   message: string;
-  isRead: boolean;
+  read: boolean;
+  isRead?: boolean;
   type: string;
   metadata: any;
   createdAt: string;
@@ -36,8 +37,7 @@ export default function HeaderNotificationBell() {
     queryKey: ['notifications'],
     queryFn: async () => {
       if (!user) return [];
-      const res = await apiClient.get<{ data: Notification[] }>('/notifications');
-      return res.data;
+      return apiClient.get<Notification[]>('/notifications');
     },
     enabled: !!user,
     refetchInterval: 30000, // Poll every 30s
@@ -52,15 +52,19 @@ export default function HeaderNotificationBell() {
     },
   });
 
-  const unreadCount = notifications?.filter(n => !n.isRead).length || 0;
+  const isUnread = (notification: Notification) => !(notification.isRead ?? notification.read);
+  const unreadCount = notifications?.filter(isUnread).length || 0;
 
   const handleNotificationClick = (notification: Notification) => {
-    if (!notification.isRead) {
+    if (isUnread(notification)) {
       markRead(notification.notificationId);
     }
     
     if (notification.type === 'event_invite' && notification.metadata?.clubId) {
       router.push(`/clubs/${notification.metadata.clubId}`);
+      setOpen(false);
+    } else if (notification.type === 'membership_update' && notification.metadata?.clubId) {
+      router.push(`/clubs/${notification.metadata.clubId}/manage`);
       setOpen(false);
     }
   };
@@ -89,7 +93,7 @@ export default function HeaderNotificationBell() {
             {notifications.map((n) => (
               <DropdownMenuItem
                 key={n.notificationId}
-                className={`p-3 cursor-pointer ${!n.isRead ? 'bg-muted/50 font-medium' : ''}`}
+                className={`p-3 cursor-pointer ${isUnread(n) ? 'bg-muted/50 font-medium' : ''}`}
                 onClick={() => handleNotificationClick(n)}
               >
                 <div className="space-y-1">
@@ -101,7 +105,7 @@ export default function HeaderNotificationBell() {
                     {new Date(n.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                {!n.isRead && (
+                {isUnread(n) && (
                   <span className="ml-auto h-2 w-2 rounded-full bg-primary" />
                 )}
               </DropdownMenuItem>

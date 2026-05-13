@@ -20,14 +20,19 @@ export default function ClubManagePage() {
   const router = useRouter();
   const clubId = params.id as string;
   
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: club, isLoading: clubLoading } = useClub(clubId);
   const { data: pendingMembers, isLoading: pendingLoading } = useClubMembers(clubId, 'pending');
   const { data: activeMembers, isLoading: activeLoading } = useClubMembers(clubId, 'active');
   const { mutate: updateStatus, isPending: isUpdating } = useUpdateMembershipStatus();
 
-  // Redirect if not admin
-  if (club && user && club.adminStudentId !== user.studentId) {
+  if (!authLoading && !isAuthenticated) {
+    router.push('/login');
+    return null;
+  }
+
+  // Redirect if not the creator of this club
+  if (club && (!user || club.adminStudentId !== user.studentId)) {
     router.push(`/clubs/${clubId}`);
     return null;
   }
@@ -36,7 +41,7 @@ export default function ClubManagePage() {
     updateStatus({ clubId, studentId, status });
   };
 
-  if (clubLoading) {
+  if (authLoading || clubLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

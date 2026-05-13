@@ -74,10 +74,10 @@ export default function InviteJoinPage() {
             <CardHeader>
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-6 w-6" />
-                <CardTitle>Successfully Joined!</CardTitle>
+                <CardTitle>Request Sent</CardTitle>
               </div>
               <CardDescription>
-                You are now a member of this club
+                The club owner can now review your request
               </CardDescription>
             </CardHeader>
             <CardContent>

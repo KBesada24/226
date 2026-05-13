@@ -42,8 +42,19 @@ export default function ClubDetailPage() {
   const { mutate: leaveClub, isPending: isLeaving } = useLeaveClub();
   const { mutate: deleteClub, isPending: isDeleting } = useDeleteClub();
   
-  const isJoined = memberships?.some((m: MembershipWithClub) => m.clubId === clubId && m.status === 'active');
+  const membership = memberships?.find((m: MembershipWithClub) => m.clubId === clubId);
+  const isJoined = membership?.status === 'active';
+  const isPendingRequest = membership?.status === 'pending';
   const isAdmin = club?.adminStudentId === user?.studentId;
+  const actionLabel = isJoining || isLeaving
+    ? 'Loading...'
+    : isJoined
+    ? 'Leave Club'
+    : isPendingRequest
+    ? 'Request Pending'
+    : membership?.status === 'rejected'
+    ? 'Request Again'
+    : 'Request to Join';
 
   const handleJoinLeave = () => {
     if (!isAuthenticated) {
@@ -53,7 +64,7 @@ export default function ClubDetailPage() {
 
     if (isJoined && user) {
       leaveClub({ clubId, studentId: user.studentId });
-    } else {
+    } else if (!isPendingRequest) {
       joinClub(clubId);
     }
   };
@@ -219,13 +230,9 @@ export default function ClubDetailPage() {
                   className="w-full"
                   variant={isJoined ? "outline" : "default"}
                   onClick={handleJoinLeave}
-                  disabled={isJoining || isLeaving}
+                  disabled={isJoining || isLeaving || isPendingRequest}
                 >
-                  {isJoining || isLeaving
-                    ? 'Loading...'
-                    : isJoined
-                    ? 'Leave Club'
-                    : 'Join Club'}
+                  {actionLabel}
                 </Button>
                 {isAdmin && (
                   <>

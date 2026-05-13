@@ -1,12 +1,11 @@
 "use client";
 
-import { Calendar, MapPin, Users } from "lucide-react";
+import { Calendar, Users } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/contexts/AuthContext";
-import { useJoinClub, useLeaveClub } from "@/lib/hooks/useClubs";
+import { useJoinClub } from "@/lib/hooks/useClubs";
 import { useStudentMemberships } from "@/lib/hooks/useStudent";
 import { useRouter } from "next/navigation";
 
@@ -36,11 +35,21 @@ export default function ClubCard({
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
   const { mutate: joinClub, isPending: isJoining } = useJoinClub();
-  const { mutate: leaveClub, isPending: isLeaving } = useLeaveClub();
   const { data: memberships } = useStudentMemberships(user?.studentId || '');
   
-  const isJoined = memberships?.some(m => m.clubId === id && m.status === 'active');
-  const isLoading = isJoining || isLeaving;
+  const membership = memberships?.find(m => m.clubId === id);
+  const isJoined = membership?.status === 'active';
+  const isPendingRequest = membership?.status === 'pending';
+  const isLoading = isJoining;
+  const buttonLabel = isLoading
+    ? 'Loading...'
+    : isJoined
+    ? 'View Club'
+    : isPendingRequest
+    ? 'Request Pending'
+    : membership?.status === 'rejected'
+    ? 'Request Again'
+    : 'Request to Join';
 
   const handleClick = () => {
     if (!isAuthenticated) {
@@ -50,8 +59,10 @@ export default function ClubCard({
 
     if (isJoined) {
       router.push(`/clubs/${id}`);
-    } else {
+    } else if (!isPendingRequest) {
       joinClub(id);
+    } else {
+      router.push(`/clubs/${id}`);
     }
   };
   return (
@@ -97,9 +108,9 @@ export default function ClubCard({
           className="w-full" 
           variant={isJoined ? "outline" : "default"}
           onClick={handleClick}
-          disabled={isLoading}
+          disabled={isLoading || isPendingRequest}
         >
-          {isLoading ? 'Loading...' : isJoined ? "View Club" : "Join Club"}
+          {buttonLabel}
         </Button>
       </CardFooter>
     </Card>

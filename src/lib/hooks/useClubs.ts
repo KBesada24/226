@@ -4,6 +4,7 @@ import { ClubFilters, Pagination } from '@/types/api.types';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { studentKeys } from './useStudent';
+import { statsKeys } from './useStats';
 
 // Query keys
 export const clubKeys = {
@@ -50,13 +51,15 @@ export function useJoinClub() {
 
   return useMutation({
     mutationFn: (clubId: string) => clubsApi.joinClub(clubId),
-    onSuccess: (_, clubId) => {
+    onSuccess: (membership, clubId) => {
       queryClient.invalidateQueries({ queryKey: clubKeys.detail(clubId) });
       queryClient.invalidateQueries({ queryKey: clubKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: clubKeys.members(clubId) });
       if (user?.studentId) {
         queryClient.invalidateQueries({ queryKey: studentKeys.memberships(user.studentId) });
+        queryClient.invalidateQueries({ queryKey: statsKeys.student(user.studentId) });
       }
-      toast.success('Successfully joined club!');
+      toast.success(membership.status === 'active' ? 'Successfully joined club!' : 'Request sent for approval');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to join club');
@@ -75,8 +78,11 @@ export function useLeaveClub() {
     onSuccess: (_, { clubId }) => {
       queryClient.invalidateQueries({ queryKey: clubKeys.detail(clubId) });
       queryClient.invalidateQueries({ queryKey: clubKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: clubKeys.members(clubId) });
+      queryClient.invalidateQueries({ queryKey: statsKeys.platform });
       if (user?.studentId) {
         queryClient.invalidateQueries({ queryKey: studentKeys.memberships(user.studentId) });
+        queryClient.invalidateQueries({ queryKey: statsKeys.student(user.studentId) });
       }
       toast.success('Left club successfully');
     },
@@ -89,11 +95,17 @@ export function useLeaveClub() {
 // Create club mutation
 export function useCreateClub() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: clubsApi.createClub,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clubKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: statsKeys.platform });
+      if (user?.studentId) {
+        queryClient.invalidateQueries({ queryKey: studentKeys.memberships(user.studentId) });
+        queryClient.invalidateQueries({ queryKey: statsKeys.student(user.studentId) });
+      }
       toast.success('Club created successfully!');
     },
     onError: (error: any) => {
@@ -132,13 +144,19 @@ export function useClubInvite(clubId: string) {
 // Join via invite mutation
 export function useJoinViaInvite() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (token: string) => clubsApi.joinViaInvite(token),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: clubKeys.detail(data.clubId) });
       queryClient.invalidateQueries({ queryKey: clubKeys.lists() });
-      toast.success('Successfully joined club!');
+      queryClient.invalidateQueries({ queryKey: clubKeys.members(data.clubId) });
+      if (user?.studentId) {
+        queryClient.invalidateQueries({ queryKey: studentKeys.memberships(user.studentId) });
+        queryClient.invalidateQueries({ queryKey: statsKeys.student(user.studentId) });
+      }
+      toast.success(data.membership.status === 'active' ? 'Successfully joined club!' : 'Request sent for approval');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to join club');
@@ -161,8 +179,11 @@ export function useUpdateMembershipStatus() {
       status: 'active' | 'rejected' 
     }) => clubsApi.updateMemberStatus(clubId, studentId, { status }),
     onSuccess: (_, { clubId, studentId }) => {
+      queryClient.invalidateQueries({ queryKey: clubKeys.detail(clubId) });
       queryClient.invalidateQueries({ queryKey: clubKeys.members(clubId) });
       queryClient.invalidateQueries({ queryKey: studentKeys.memberships(studentId) });
+      queryClient.invalidateQueries({ queryKey: statsKeys.student(studentId) });
+      queryClient.invalidateQueries({ queryKey: statsKeys.platform });
       toast.success('Membership status updated successfully');
     },
     onError: (error: any) => {
